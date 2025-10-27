@@ -20,7 +20,9 @@ uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png
 if uploaded_file is not None:
     # Preprocess image
     image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Uploaded Image", use_column_width=True)
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.image(image, caption="Uploaded Image", width=300)
 
     # Resize as per your model input
     img = image.resize((64, 64))  # change to your input size
