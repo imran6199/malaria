@@ -2,35 +2,67 @@ import streamlit as st
 import numpy as np
 from PIL import Image
 import tensorflow as tf
+from pathlib import Path
 
-# Load the model once
+# --- CONFIG: update if your models have different filenames or input sizes ---
+MODEL_CONFIG = {
+    "Malaria": {"file": "malaria.h5", "input_size": (64, 64)},
+    "Pneumonia": {"file": "pneumonia.h5", "input_size": (64, 64)},
+}
+# ---------------------------------------------------------------------------
+
 @st.cache_resource
-def load_model():
-    model = tf.keras.models.load_model("malaria.h5")
-    return model
+def load_model(path: str):
+    """Load and return a Keras model from the given path."""
+    return tf.keras.models.load_model(path)
 
-model = load_model()
+st.set_page_config(page_title="Malaria & Pneumonia Detector", layout="centered")
+st.title("🧫 Malaria & Pneumonia Detection App")
+st.write("Select a model, then upload a blood-smear / chest X-ray image to predict.")
 
-# Streamlit UI
-st.title("🧫 Malaria Detection App")
-st.write("Upload a blood smear image to check for malaria infection.")
+# Model selector
+choice = st.radio("Choose model", list(MODEL_CONFIG.keys()))
+
+config = MODEL_CONFIG[choice]
+model_path = config["file"]
+input_size = config["input_size"]
+
+# Try to load model (cached by path)
+model = None
+if Path(model_path).exists():
+    with st.spinner(f"Loading {choice} model..."):
+        model = load_model(model_path)
+else:
+    st.warning(f"Model file `{model_path}` not found in repo. Please add it to the project root.")
+    st.stop()
 
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
-if uploaded_file is not None:
-    # Preprocess image
+if uploaded_file:
+    # Display image (centered)
     image = Image.open(uploaded_file).convert("RGB")
-    col1, col2, col3 = st.columns([1,2,1])
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.image(image, caption="Uploaded Image", width=300)
 
-    # Resize as per your model input
-    img = image.resize((64, 64))  # change to your input size
-    img_array = np.array(img) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
+    # Preprocess
+    img = image.resize(input_size)
+    x = np.expand_dims(np.array(img) / 255.0, axis=0)
 
-    # Prediction
-    prediction = model.predict(img_array)
-    result = "🦠 Infected (Malaria Positive)" if prediction[0][0] > 0.5 else "✅ Uninfected (Malaria Negative)"
+    # Predict
+    with st.spinner("Predicting..."):
+        pred = model.predict(x)[0]
+        # Handle binary output shapes like [prob] or [p0, p1]
+        if pred.shape == ():  # scalar
+            score = float(pred)
+        else:
+            score = float(pred[0]) if np.size(pred) == 1 else float(pred[0])
 
-    st.subheader(f"Result: {result}")
+    # Interpret result (threshold 0.5)
+    label = "🦠 Infected (Positive)" if score > 0.5 else "✅ Uninfected (Negative)"
+    st.subheader(f"{choice} result: {label}")
+    st.write(f"Confidence: **{score:.3f}**")
+
+    # Optional: show more info
+    if score > 0.5:
+        st.info("Model predicts positive. Consult a medical professional for confirmation.")
