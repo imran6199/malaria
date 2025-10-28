@@ -49,20 +49,28 @@ if uploaded_file:
     img = image.resize(input_size)
     x = np.expand_dims(np.array(img) / 255.0, axis=0)
 
-    # Predict
+        # Predict
     with st.spinner("Predicting..."):
         pred = model.predict(x)[0]
-        # Handle binary output shapes like [prob] or [p0, p1]
         if pred.shape == ():  # scalar
             score = float(pred)
         else:
             score = float(pred[0]) if np.size(pred) == 1 else float(pred[0])
 
     # Interpret result (threshold 0.5)
-    label = "🦠 Infected (Positive)" if score > 0.5 else "✅ Uninfected (Negative)"
-    st.subheader(f"{choice} result: {label}")
-    st.write(f"Confidence: **{score:.3f}**")
-
-    # Optional: show more info
     if score > 0.5:
-        st.info("Model predicts positive. Consult a medical professional for confirmation.")
+        label = "🦠 Infected (Positive)"
+        color = "red"
+        message = "⚠️ Model predicts **positive**. Please consult a medical professional for confirmation."
+    else:
+        label = "✅ Uninfected (Negative)"
+        color = "green"
+        message = "🟢 Model predicts **negative**. No infection detected."
+
+    # Display result
+    st.subheader(f"{choice} result: {label}")
+    st.markdown(
+        f"<p style='color:{color}; font-size:18px; font-weight:bold;'>{message}</p>",
+        unsafe_allow_html=True,
+    )
+    st.write(f"Confidence: **{score:.3f}**")
